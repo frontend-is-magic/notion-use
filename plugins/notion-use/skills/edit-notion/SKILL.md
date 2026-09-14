@@ -20,7 +20,7 @@ AI 判断语义、否定句和指代；不要用关键词命中替代判断。`�
 
 执行：
 1. `client.fetchPage(pageId)`；检查截断/unknown blocks、评论锚点和原生子页面。保存 `NotionUse.body(page)` 为 plan.baseContent。
-2. 生成 plan（operationId、pageId、mode、baseContent、content 或 updates、verify）；大段新增/重写先 lint。补齐缺失封面和图标需要生成、上传、回读；已有合格视觉不必重复生成。
+2. 生成 plan（operationId、pageId、mode、baseContent、content 或 updates、verify）；全文重写或追加至少 500 字时，对完整候选正文执行 requireIllustrations；按 documentType 处理纯文字豁免，封面不计入正文图数。小范围修字不扩展为整篇配图改造。补齐缺失封面和图标需要生成、上传、回读；已有合格视觉不必重复生成。
 3. `client.edit(plan)` 在写入前重新 fetch，脚本比较 baseContent，唯一匹配锚点并校验子页面不丢失。冲突时自动重新读取、重新生成一次语义计划；再次冲突报告 CONCURRENT_EDIT_BLOCKED，不覆盖他人修改。
 4. 全文替换保留原始 `<page>`、`<database>`、`<folder>` 标签。`mention-page` 不能代替子页标签。脚本永远不设置 allow_deleting_content=true；需要删除页面或子页面时进入唯一的删除确认点。
 5. 回读目标内容和层级，核对未涉及的段落。写后验证失败或响应丢失时先对账，不重发追加/覆盖。报告实际模式和验证结果。

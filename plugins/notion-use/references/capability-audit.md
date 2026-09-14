@@ -16,3 +16,8 @@
 | 触发隔离 | 原插件为 Notion 业务模板 | 四技能均增加目标平台门槛；飞书等输出任务零 Notion 写入 |
 
 来源：本地 Notion 0.1.8 四个 skills 和当前 ALL_TOOLS metadata；官方 [Comment update](https://developers.notion.com/reference/update-a-comment)、[Working with comments](https://developers.notion.com/guides/data-apis/working-with-comments)、[File uploads](https://developers.notion.com/guides/data-apis/uploading-small-files)。公开 API 允许 file_upload 对象并不等于当前 MCP string 字段支持同样的引用。
+
+## 0.3 更新
+
+- 原人工评论的 🤖 reaction 是独立步骤：回复回读后执行，失败留待办，不重复发送回复；当前官方连接无 reaction 写入接口，使用已授权 UI 适配。
+- 非纯文字正文采用 2000–5000 字/有效图、默认 3000 字/图，短文至少一图；正文与折叠附录分开检查，不用封面或重复图填数。[依据和边界](visual-density.md)。

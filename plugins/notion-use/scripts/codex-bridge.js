@@ -9,7 +9,7 @@
   }));
   const execute=host.execute || tools.exec_command;
   const safe=value=>{
-    if(value.result){const r=value.result;return {...value,result:Object.fromEntries(['status','id','url','reading','nativeResolved','discussionId'].filter(k=>k in r).map(k=>[k,r[k]]))};}
+    if(value.result){const r=value.result;return {...value,result:Object.fromEntries(['status','id','url','reading','nativeResolved','discussionId','replyOperationId','pageId','replyId','reactionTargets'].filter(k=>k in r).map(k=>[k,r[k]]))};}
     return value;
   };
   async function journalOp(action,key,value={}) {
@@ -25,7 +25,7 @@
   return NotionUse.createClient(async(short,args)=>{
     if(!names[short] || typeof tools[names[short]]!=='function')throw new Error('CAPABILITY_UNAVAILABLE:'+short);
     return tools[names[short]](args);
-  },{journal,pause:host.pause || (ms=>new Promise(resolve=>setTimeout(resolve,ms)))});
+  },{journal,ensureReaction:host.ensureReaction,reactionTransport:host.reactionTransport,pause:host.pause || (ms=>new Promise(resolve=>setTimeout(resolve,ms)))});
 });
 
 // Bridge from the tool-orchestration isolate into a host Node REPL. No shell or network required.

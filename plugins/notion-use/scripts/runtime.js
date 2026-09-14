@@ -42,6 +42,65 @@
     const words=(text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,' ').match(/[\p{L}\p{N}]+/gu)||[]).length;
     return {minutes:Math.round((cjk/400+words/220)*100)/100,cjk,words,foldedOrCodeChars:hidden};
   }
+  const textUnits = text => {
+    const clean=plain(text).replace(/https?:\/\/\S+/g,'');
+    const cjk=(clean.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu)||[]).length;
+    const words=(clean.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,' ').match(/[\p{L}\p{N}]+/gu)||[]).length;
+    return cjk+words;
+  };
+  const textOnlyTypes=new Set(['summary','brief','meeting-minutes','checklist','index','changelog']);
+  function illustrationAudit(content,options={}) {
+    if((options.textOnly && options.explicitTextOnly) || textOnlyTypes.has(options.documentType) || options.isCategory)
+      return {required:false,sections:[],errors:[],warnings:[]};
+    const sections=[{scope:'main',content:''}];let depth=0,fold,fence=null;
+    for(const line of content.split('\n')) {
+      const mark=line.match(/^[\t ]*(`{3,}|~{3,})/);
+      if(fence || mark){(depth?fold:sections[0]).content+=line+'\n';if(!fence)fence=mark[1];else if(mark&&mark[1]===fence&&line.trim()===fence)fence=null;continue;}
+      if(/^\s*<details\b/.test(line)){if(!depth){fold={scope:'appendix-'+sections.length,content:''};sections.push(fold);}depth++;continue;}
+      if(/^\s*<\/details>/.test(line)){depth--;continue;}
+      if(/^\s*<summary>/.test(line))continue;
+      (depth?fold:sections[0]).content+=line+'\n';
+    }
+    const excluded=new Set([options.cover,options.icon].filter(Boolean)),seen=new Set();
+    const results=sections.map(section=>{
+      const source=section.content.replace(/<!--[\s\S]*?-->/g,'');
+      const tokens=/(^[\t ]*(`{3,}|~{3,})([^\n]*)\n[\s\S]*?^[\t ]*\2[^\n]*(?:\n|$))|((?<!\\)!\[[^\]]*\]\(([^\n)]+)\))|(<image\b[^>]*\bsrc=["']([^"']+)["'][^>]*(?:\/>|>[\s\S]*?<\/image>))|((?<![\\`])(`+)(?!`)[^\n]*?\9(?!`))/gm;
+      let offset=0,units=0,gap=0,maxGap=0;const figures=[];
+      const addText=text=>{const count=textUnits(text);units+=count;gap+=count;maxGap=Math.max(maxGap,gap);};
+      for(const match of source.matchAll(tokens)) {
+        addText(source.slice(offset,match.index));offset=match.index+match[0].length;
+        let key;
+        if(match[8]) {
+          // Inline code is an example, not rendered image content.
+        } else if(match[1]) {
+          if(match[3].trim()==='mermaid') {
+            const diagram=match[1].replace(/^[^\n]*\n/,'').replace(/[\t ]*(`{3,}|~{3,})[^\n]*\n?$/,'').trim();
+            if(diagram)key='mermaid:'+diagram;
+          }
+        } else {
+          const url=(match[5]||match[7]||'').trim().split(/\s+["']/)[0];
+          if(/^(https?:\/\/|file-upload:\/\/)/.test(url) && !excluded.has(url))key=url;
+        }
+        if(key && !seen.has(key)){seen.add(key);figures.push({key,at:units});gap=0;}
+      }
+      addText(source.slice(offset));
+      const minimum=section.scope==='main'?Math.max(1,Math.ceil(units/5000)):(units>=2000?Math.ceil(units/5000):0);
+      const maximum=Math.max(minimum,Math.floor(units/2000));
+      const target=Math.max(minimum,Math.min(maximum,Math.round(units/3000)));
+      const errors=[],warnings=[];
+      if(figures.length<minimum)errors.push('INLINE_ILLUSTRATIONS_REQUIRED');
+      if(maxGap>5000)errors.push('ILLUSTRATION_GAP_TOO_LONG');
+      if(figures.length>maximum && !options.densityOverrideReason)warnings.push('DENSITY_JUSTIFICATION_REQUIRED');
+      return {scope:section.scope,units,figures:figures.length,minimum,target,maximum,maxGap,errors,warnings};
+    });
+    return {required:true,sections:results,errors:results.flatMap(r=>r.errors.map(code=>({scope:r.scope,code}))),warnings:results.flatMap(r=>r.warnings.map(code=>({scope:r.scope,code})))};
+  }
+  function requireIllustrations(content,options={}) {
+    const audit=illustrationAudit(content,options);
+    if(audit.errors.length)fail(audit.errors[0].code,audit.errors[0].scope);
+    if(audit.warnings.length)fail(audit.warnings[0].code,audit.warnings[0].scope);
+    return audit;
+  }
   function lint(d) {
     if (!d.title?.trim() || !d.content?.trim()) fail('EMPTY_DOCUMENT');
     const first=d.content.trim().split('\n')[0];
@@ -56,6 +115,7 @@
     if (!d.icon || !d.cover || d.icon==='none' || d.cover==='none') fail('VISUALS_REQUIRED');
     if (!d.visuals?.aiGenerated || !d.visuals?.inspected || !d.visuals?.prompt) fail('VISUAL_PROVENANCE_REQUIRED');
     if (!/^https:\/\//.test(d.cover) || !/^https:\/\//.test(d.icon)) fail('STABLE_VISUAL_URL_REQUIRED');
+    r.illustrations=requireIllustrations(d.content,d);
     return r;
   }
   function choose(candidates, {explicitId, visibility='private'}={}) {
@@ -108,9 +168,9 @@
     for (const d of xml.matchAll(/<discussion\b([^>]*)>([\s\S]*?)<\/discussion>/g)) {
       const a=attrs(d[1]), comments=[];
       for (const c of d[2].matchAll(/<comment\b([^>]*)>([\s\S]*?)<\/comment>/g)) {
-        const ca=attrs(c[1]); comments.push({id:ca.id||ca.url,author:ca.author||ca.author_id,text:decode(c[2].trim()),...ca});
+        const ca=attrs(c[1]); comments.push({id:ca.id||ca.url,author:ca.author||ca.author_id||idOf(ca['user-url']),text:decode(c[2].trim()),...ca});
       }
-      out.push({...a,id:a.url||a.id,resolved:a.resolved==='true',comments});
+      out.push({...a,id:a.url||a.id,block_id:a.block_id||String(a.url||a.id||'').split('/')[3],resolved:a.resolved==='true',comments});
     }
     if (!out.length && /<discussion\b/.test(xml)) fail('UNSUPPORTED_COMMENTS_SHAPE');
     return out;
@@ -133,7 +193,7 @@
   }
   const normalized=s=>s.split('\n').map(l=>l.trimEnd()).filter(l=>l.trim()&&l.trim()!=='<empty-block/>').join('\n');
   const location=p=>JSON.stringify([p.path||null,(p.text||'').match(/<ancestor-path>([\s\S]*?)<\/ancestor-path>/)?.[1]||'',p.parent||null,p.teamspace_id||null]);
-  function createClient(call, {journal, pause=async()=>{}, now=()=>Date.now()}={}) {
+  function createClient(call, {journal, pause=async()=>{}, now=()=>Date.now(), ensureReaction, reactionTransport='ui'}={}) {
     let self, specLoaded=false;
     const api=async(name,args) => unpack(await call(name,args));
     async function preflight() { self=await api('fetch',{id:'self'}); return self; }
@@ -219,6 +279,7 @@
       else if(plan.mode==='append')expected+='\n'+plan.content;
       else if(plan.mode==='prepend')expected=plan.content+'\n'+expected;
       else expected=plan.content;
+      if(plan.mode==='replace' || plan.enforceIllustrations || ((plan.mode==='append'||plan.mode==='prepend') && textUnits(plan.content)>=500))requireIllustrations(expected,{...plan,cover:plan.cover||p.cover?.external?.url,icon:plan.icon||p.icon?.external?.url});
       return once(plan.operationId,async()=>{
         await settle(await api('update_page',args));const fresh=await fetchPage(plan.pageId),content=body(fresh);
         if(normalized(content)!==normalized(expected))fail('CONTENT_READBACK_FAILED');
@@ -235,18 +296,20 @@
       return {page,raw,coverage,pending:pending(ds,scope,coverage)};
     }
     async function reply(plan) {
-      const done=await receipt(plan.operationId);if(done)return done;
+      const done=await receipt(plan.operationId);if(done)return completeReactions(done);
       const scope={...plan.scope,discussionIds:[plan.discussionId]};
       const snapshot=await comments(plan.pageId,scope);
-      const target=snapshot.pending.find(x=>x.discussionId===plan.discussionId);
+      const pendingTarget=snapshot.pending.find(x=>x.discussionId===plan.discussionId);
+      const target=pendingTarget?{...pendingTarget,comments:pendingTarget.comments.map(c=>({...c}))}:null;
       if(!target)return {status:'skipped_no_new_human_comment'};
       if(target.sourceKey!==plan.sourceKey)fail('COMMENT_CHANGED');
       if(!plan.text?.trim())fail('EMPTY_REPLY');
       if(aiText(plan.text))fail('PREFIX_MUST_BE_ADDED_ONCE');
       const text='🤖 **AI：**'+plan.text.trim();
-      const before=discussions(snapshot.raw).find(d=>d.id===plan.discussionId);
+      const originalThread=discussions(snapshot.raw).find(d=>d.id===plan.discussionId);
+      const before={...originalThread,comments:originalThread.comments.map(c=>({...c}))};
       const oldIds=new Set(before.comments.map(c=>c.id));
-      return once(plan.operationId,async()=>{
+      const replyResult=await once(plan.operationId,async()=>{
         const created=await api('create_comment',{page_id:plan.pageId,discussion_id:plan.discussionId,markdown:text});
         const createdId=created.id||created.comment_id||created.comment?.id;
         const check=await api('get_comments',{page_id:plan.pageId,discussion_id:plan.discussionId,include_all_blocks:true,include_resolved:true});
@@ -258,10 +321,47 @@
         if(!baseline){let lastAI=-1;before.comments.forEach((c,i)=>{if(aiText(c.text||''))lastAI=i;});baseline=before.comments.slice(0,lastAI+1).filter(c=>!aiText(c.text||'')).map(sourceId);}
         const sourceIds=[...new Set([...baseline,...target.comments.map(sourceId)])];
         await journal.put('coverage:'+idOf(plan.pageId)+':'+plan.discussionId,{sourceIds});
-        return {status:'replied',nativeResolved:false,discussionId:plan.discussionId};
+        return {status:'replied',nativeResolved:false,discussionId:plan.discussionId,replyOperationId:plan.operationId,pageId:plan.pageId,replyId:after.comments[newIndex].id,reactionTargets:target.comments.map(c=>({commentId:c.id,sourceId:sourceId(c)}))};
       });
+      return completeReactions(replyResult);
     }
-    return {preflight,search,scan,paginate,fetchPage,create,edit,comments,reply};
+    const reactionKey=job=>'reaction:'+idOf(job.pageId)+':'+job.commentId+':'+job.sourceId;
+    async function confirmReaction(job,evidence) {
+      const original=await journal.get(job.replyOperationId);
+      if(original?.status!=='verified' || original.result?.pageId!==job.pageId || original.result?.discussionId!==job.discussionId || !original.result.reactionTargets?.some(t=>t.commentId===job.commentId&&t.sourceId===job.sourceId))fail('REACTION_NOT_IN_VERIFIED_REPLY');
+      if(evidence?.commentId!==job.commentId||evidence.emoji!=='🤖'||evidence.present!==true||evidence.actorMatches!==true)fail('REACTION_EVIDENCE_REQUIRED');
+      const raw=await api('get_comments',{page_id:job.pageId,discussion_id:job.discussionId,include_all_blocks:true,include_resolved:true});
+      const current=discussions(raw).find(d=>d.id===job.discussionId)?.comments.find(c=>c.id===job.commentId);
+      if(!current||sourceId(current)!==job.sourceId||aiText(current.text||''))fail('REACTION_SOURCE_CHANGED');
+      await journal.put(reactionKey(job),{status:'verified',commentId:job.commentId,emoji:'🤖',at:now()});
+      return {commentId:job.commentId,status:'verified'};
+    }
+    const uiControlKey='control:notion-reaction-ui';
+    async function resumeReactionUI(authorization) {
+      if(authorization?.explicitUserResume!==true || !authorization.requestId)fail('EXPLICIT_USER_RESUME_REQUIRED');
+      await journal.put(uiControlKey,{status:'resumed',requestId:authorization.requestId,at:now()});
+    }
+    async function completeReactions(result) {
+      const targets=result.reactionTargets||[];
+      if(!targets.length)return {...result,reactionStatus:'not_recorded',reactionJobs:[]};
+      const completed=[],jobs=[];const control=await journal.get(uiControlKey);let guiStopped=reactionTransport!=='api' && control?.status==='suspended';
+      for(const target of targets) {
+        const job={...target,pageId:result.pageId,discussionId:result.discussionId,replyOperationId:result.replyOperationId,emoji:'🤖'};
+        const previous=await journal.get(reactionKey(job));
+        if(previous?.status==='verified'){completed.push({commentId:job.commentId,status:'verified'});continue;}
+        if(guiStopped){jobs.push({...job,reason:'USER_CONTROL_ACTIVE'});continue;}
+        if(typeof ensureReaction!=='function'){jobs.push({...job,reason:'REACTION_CAPABILITY_UNAVAILABLE'});continue;}
+        try {
+          const raw=await api('get_comments',{page_id:job.pageId,discussion_id:job.discussionId,include_all_blocks:true,include_resolved:true});
+          const current=discussions(raw).find(d=>d.id===job.discussionId)?.comments.find(c=>c.id===job.commentId);
+          if(!current||sourceId(current)!==job.sourceId||aiText(current.text||''))fail('REACTION_SOURCE_CHANGED');
+          const evidence=await ensureReaction({...job,commentText:current.text,commentUrl:current.url,authorId:current.author});
+          completed.push(await confirmReaction(job,evidence));
+        } catch(e) {if(['USER_CONTROL_ACTIVE','BROWSER_CONTROL_INTERRUPTED','HUMAN_IDENTITY_PROOF_REQUIRED'].includes(e.code)){guiStopped=true;await journal.put(uiControlKey,{status:'suspended',reason:e.code,at:now()});}jobs.push({...job,reason:e.code||'REACTION_UNVERIFIED'});}
+      }
+      return {...result,reactionStatus:jobs.length?'pending':'verified',reactions:completed,reactionJobs:jobs};
+    }
+    return {preflight,search,scan,paginate,fetchPage,create,edit,comments,reply,confirmReaction,resumeReactionUI};
   }
-  return {idOf,unpack,body,links,reading,lint,choose,preserve,editArgs,discussions,pending,sourceId,normalized,location,createClient};
+  return {idOf,unpack,body,links,reading,textUnits,illustrationAudit,requireIllustrations,lint,choose,preserve,editArgs,discussions,pending,sourceId,normalized,location,createClient};
 })());

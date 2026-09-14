@@ -71,3 +71,10 @@ python3 scripts/build-web-skill.py --out work/notion-use-web-skill.zip
 网页技能已通过 Chrome 上传并启用，技能链接为 [notion-use](https://chatgpt.com/skills?skill_id=6aa7bc56a4a48191ae0f8233f0230fe4)。这是个人网页技能，不代表 GitHub marketplace 已导入，也不会自动同步后续 GitHub 提交。
 
 网页包的图标由内置图像生成绘制，采用 Notion 黑白 N 的折页异化造型。`web/` 中保留 PNG、兼容 SVG 与界面配置；构建器会将它们一并打包。已目视确认网页列表使用自绘图标，`allow_implicit_invocation` 为 true。原始 Notion 平台触发边界和四套工作流保留。
+
+
+## 评论标记与正文图文密度
+
+AI 回复经回读确认后，给本次处理的原人工评论添加 🤖 reaction；回复前缀保持不变。reaction 与回复分别记录，已有本账号标记不重复切换。官方连接缺少 reaction 端点时，按已有授权浏览器 UI 完成，无法完成则准确返回待办。
+
+非纯文字文档默认约 3000 字一幅有效说明图，检查区间为 2000–5000 字/图；短文至少一幅。封面、图标、重复/装饰图不计数，折叠附录不抵扣正文图数。详见 [密度规则及研究依据](plugins/notion-use/references/visual-density.md)。

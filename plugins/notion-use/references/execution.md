@@ -69,9 +69,9 @@ operationId 包含工作空间、目标父/页面和本次请求的稳定标识�
 
 ## Plan 契约
 
-创建：`{operationId,parentId,parentLocation,privateRoot?,visibility:'private'|'shared'|'team',title,content,icon,cover,visuals:{aiGenerated:true,inspected:true,prompt},concise?,shortForm?,isCategory?,verify:[exactAnchors]}`。parentLocation 必须从计划阶段 `NotionUse.location(await client.fetchPage(parentId))` 保存，或使用 scan 节点的 location；写前和写后重新比较，移动位置则重新分类。此快照核验目录位置，不等于完整 ACL 查询，接口未返回的共享权限不可推断。顶层私人分类显式 `privateRoot:true` 且不填 parentId。team 必须有实际父页证据 teamEvidence。public 标签只指已共享父页并需要 existingSharedParent；不调用发布 API。
+创建：`{operationId,parentId,parentLocation,privateRoot?,visibility:'private'|'shared'|'team',title,content,icon,cover,visuals:{aiGenerated:true,inspected:true,prompt},documentType?,densityOverrideReason?,concise?,shortForm?,isCategory?,verify:[exactAnchors]}`。parentLocation 必须从计划阶段 `NotionUse.location(await client.fetchPage(parentId))` 保存，或使用 scan 节点的 location；写前和写后重新比较，移动位置则重新分类。此快照核验目录位置，不等于完整 ACL 查询，接口未返回的共享权限不可推断。顶层私人分类显式 `privateRoot:true` 且不填 parentId。team 必须有实际父页证据 teamEvidence。public 标签只指已共享父页并需要 existingSharedParent；不调用发布 API。
 
-编辑：`{operationId,pageId,baseContent,mode:'append'|'prepend'|'patch'|'replace',content?,updates?:[{old_str,new_str}],explicitReplace?,icon?,cover?,verify?}`。baseContent 必须来自本次 fetch 的 body；AI 不手工重建快照。默认禁止子页面删除或移动；特殊块只做精准编辑。
+编辑：`{operationId,pageId,baseContent,mode:'append'|'prepend'|'patch'|'replace',documentType?,enforceIllustrations?,densityOverrideReason?,content?,updates?:[{old_str,new_str}],explicitReplace?,icon?,cover?,verify?}`。baseContent 必须来自本次 fetch 的 body；AI 不手工重建快照。默认禁止子页面删除或移动；特殊块只做精准编辑。
 
 评论：`client.comments(pageId,scope)` 返回原始评论与 pending。`client.reply({operationId,pageId,discussionId,sourceKey,text,scope})` 在发送前保留 authorIds/blockIds 范围再次读取讨论。成功回复后记录已处理人工评论 ID 与内容摘要，不记录评论正文，其他作者未处理的问题会继续保留。正文修复是独立的 edit 操作，失败不发送“已修复”。
 
@@ -91,3 +91,9 @@ journal.claim 使用排他创建，在外部写入之前落盘。已 verified �
 ## 交付状态
 
 明确区分：本地校验通过、API 已接收、异步完成、内容已回读、原生评论已关闭。只报告确已完成项。每次写入报告页面实际位置和链接；评论闭环报告正文修改和回复各自状态。请求创建的是介绍文档，不会自动 convert_page_to_skill 把页面标成 Notion 原生 Skill。
+
+## 评论 reaction 与正文插图
+
+回复完成后必须按 [comment-reactions.md](comment-reactions.md) 给选定原人工评论补 🤖 reaction。host.ensureReaction 接收已验证目标并返回实际回读证据；缺少接口时返回 reactionJobs，使用已授权 UI 完成后 confirmReaction。不能把回复成功等同 reaction 成功。
+
+正文配图遵守 [visual-density.md](visual-density.md)。新建/重写默认执行 requireIllustrations；纯文字类型必须显式给 documentType，默认 knowledge 不豁免。

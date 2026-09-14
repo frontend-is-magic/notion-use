@@ -66,3 +66,8 @@ python3 scripts/build-web-skill.py --out work/notion-use-web-skill.zip
 ```
 
 该 ZIP 只有一个 `notion-use/SKILL.md` 入口，内部按任务加载原来的四套工作流；保留同一份执行脚本，不打包 marketplace 或插件的应用依赖配置。使用已经连接的 Notion 应用。此包已完成本地结构、引用与技能格式校验，网页上传接受与启用状态仍需实际回读，不能把打包成功称为安装成功。上传不会建立 GitHub 自动同步。
+
+
+网页技能已通过 Chrome 上传并启用，技能链接为 [notion-use](https://chatgpt.com/skills?skill_id=6aa7bc56a4a48191ae0f8233f0230fe4)。这是个人网页技能，不代表 GitHub marketplace 已导入，也不会自动同步后续 GitHub 提交。
+
+网页包的图标由内置图像生成绘制，采用 Notion 黑白 N 的折页异化造型。`web/` 中保留 PNG、兼容 SVG 与界面配置；构建器会将它们一并打包。已目视确认网页列表使用自绘图标，`allow_implicit_invocation` 为 true。原始 Notion 平台触发边界和四套工作流保留。

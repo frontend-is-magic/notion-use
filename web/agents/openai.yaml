@@ -1,0 +1,13 @@
+interface:
+  display_name: notion use
+  short_description: 在 Notion 创建、归类、编辑笔记和处理评论时使用，自动选择文风、图标、封面和折叠结构。仅当目标明确为 Notion
+    或延续已确认的 Notion 页面任务时触发；飞书/Lark/Word/Google Docs 等输出请求、仅把 Notion 当资料来源时不触发。
+  icon_small: "./notion-use-mutant-icon-256.png"
+  icon_large: "./notion-use-mutant-icon-256.png"
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

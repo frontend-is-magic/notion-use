@@ -6,6 +6,8 @@ root=Path(__file__).resolve().parents[1]
 plugin=root/'plugins/notion-use'
 p=argparse.ArgumentParser();p.add_argument('--out',required=True);a=p.parse_args()
 files={'SKILL.md':(root/'web/SKILL.md').read_text()}
+for asset in (root/'web').rglob('*'):
+ if asset.is_file() and asset.name!='SKILL.md':files[str(asset.relative_to(root/'web'))]=asset.read_bytes()
 for path in (plugin/'scripts').iterdir():
  if path.is_file() and path.suffix in {'.js','.mjs','.py'}:files['scripts/'+path.name]=path.read_text()
 for path in (plugin/'references').glob('*.md'):files['references/'+path.name]=path.read_text()

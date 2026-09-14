@@ -1,0 +1,29 @@
+{
+  "name": "notion-use",
+  "version": "0.2.0",
+  "description": "仅针对 Notion 的自动分类写作、精准编辑、评论闭环与视觉规则，复用现有 Notion 连接。",
+  "author": {
+    "name": "bloodymoon",
+    "url": "https://github.com/frontend-is-magic"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Notion Use",
+    "shortDescription": "Notion 自动分类、写作、编辑与评论处理",
+    "longDescription": "只在明确的 Notion 任务中触发。固定步骤由脚本调用已有 Notion API，语义与视觉由 AI 完成；复用当前身份，不重复询问。",
+    "developerName": "bloodymoon",
+    "category": "Productivity",
+    "capabilities": [
+      "Write"
+    ],
+    "defaultPrompt": [
+      "在 Notion 创建一篇笔记并自动归类",
+      "把这些内容追加到这篇 Notion 笔记",
+      "处理这篇 Notion 文档中的人工评论"
+    ],
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  },
+  "apps": "./.app.json",
+  "repository": "https://github.com/frontend-is-magic/notion-use"
+}

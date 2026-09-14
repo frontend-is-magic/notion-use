@@ -55,3 +55,14 @@ node --test plugins/notion-use/tests/*.test.cjs
 ```
 
 运行 Node 测试要求 Node.js 18 或更新版本。包布局验证要求 Python 3.9 或更新版本。测试使用临时目录和模拟 Notion 响应，不写入真实文档。
+
+
+## 个人账号的网页技能包
+
+网页版“技能 → ＋ → 从电脑上传”与工作空间 GitHub marketplace 导入是不同入口。针对技能上传，可从同一份插件源码构建一个独立网页技能：
+
+```sh
+python3 scripts/build-web-skill.py --out work/notion-use-web-skill.zip
+```
+
+该 ZIP 只有一个 `notion-use/SKILL.md` 入口，内部按任务加载原来的四套工作流；保留同一份执行脚本，不打包 marketplace 或插件的应用依赖配置。使用已经连接的 Notion 应用。此包已完成本地结构、引用与技能格式校验，网页上传接受与启用状态仍需实际回读，不能把打包成功称为安装成功。上传不会建立 GitHub 自动同步。

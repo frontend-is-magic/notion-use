@@ -17,3 +17,4 @@ jobs:
           python-version: '3.12'
       - run: python3 scripts/check-package.py
       - run: node --test plugins/notion-use/tests/*.test.cjs
+      - run: python3 scripts/build-web-skill.py --out work/notion-use-web-skill.zip
